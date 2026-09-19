@@ -3,8 +3,9 @@ package com.mtheory7.wyatt2.controller;
 import com.coinbase.advanced.model.portfolios.GetPortfolioBreakdownRequest;
 import com.coinbase.advanced.model.portfolios.GetPortfolioBreakdownResponse;
 import com.coinbase.advanced.model.portfolios.ListPortfoliosRequest;
-import com.coinbase.advanced.model.portfolios.PortfolioBalances;
 import com.coinbase.advanced.portfolios.PortfoliosService;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -16,6 +17,7 @@ import java.math.BigDecimal;
 @RequestMapping("/api/balance")
 public class BalanceController {
 
+    private static final Logger logger = LogManager.getLogger(BalanceController.class);
     private final PortfoliosService portfoliosService;
     private final String portfolioUUID;
 
@@ -26,6 +28,7 @@ public class BalanceController {
 
     @GetMapping("/{asset}")
     public String getAssetBalance(@PathVariable String asset) {
+        logger.debug("Getting Asset Balances...");
         GetPortfolioBreakdownResponse balancesResponse = portfoliosService.getPortfolioBreakdown(new GetPortfolioBreakdownRequest(portfolioUUID));
         return BigDecimal.valueOf(balancesResponse.getBreakdown().getSpotPositions()
                 .stream()
