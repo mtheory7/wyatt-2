@@ -2,6 +2,8 @@ package com.mtheory7.wyatt2.controller;
 
 import com.coinbase.advanced.model.products.GetProductRequest;
 import com.coinbase.advanced.products.ProductsService;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -9,6 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/price")
 public class PriceController {
+    private static final Logger logger = LogManager.getLogger(PriceController.class);
 
     private final ProductsService productsService;
 

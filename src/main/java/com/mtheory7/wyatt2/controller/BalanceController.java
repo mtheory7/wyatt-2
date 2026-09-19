@@ -16,7 +16,6 @@ import java.math.BigDecimal;
 @RestController
 @RequestMapping("/api/balance")
 public class BalanceController {
-
     private static final Logger logger = LogManager.getLogger(BalanceController.class);
     private final PortfoliosService portfoliosService;
     private final String portfolioUUID;
@@ -28,7 +27,6 @@ public class BalanceController {
 
     @GetMapping("/{asset}")
     public String getAssetBalance(@PathVariable String asset) {
-        logger.debug("Getting Asset Balances...");
         GetPortfolioBreakdownResponse balancesResponse = portfoliosService.getPortfolioBreakdown(new GetPortfolioBreakdownRequest(portfolioUUID));
         return BigDecimal.valueOf(balancesResponse.getBreakdown().getSpotPositions()
                 .stream()
