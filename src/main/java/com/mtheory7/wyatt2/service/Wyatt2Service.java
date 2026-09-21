@@ -1,8 +1,10 @@
 package com.mtheory7.wyatt2.service;
 
-import com.coinbase.advanced.model.orders.ListOrdersRequest;
-import com.coinbase.advanced.model.orders.Order;
+import com.coinbase.advanced.model.orders.*;
+import com.coinbase.advanced.model.portfolios.GetPortfolioBreakdownRequest;
+import com.coinbase.advanced.model.portfolios.GetPortfolioBreakdownResponse;
 import com.coinbase.advanced.model.portfolios.ListPortfoliosRequest;
+import com.coinbase.advanced.model.portfolios.SpotPosition;
 import com.coinbase.advanced.model.products.GetProductCandlesRequest;
 import com.coinbase.advanced.model.products.GetProductCandlesResponse;
 import com.coinbase.advanced.model.products.GetProductRequest;
@@ -14,9 +16,15 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.text.DecimalFormat;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 @Component
 public class Wyatt2Service {
@@ -30,19 +38,25 @@ public class Wyatt2Service {
     private final PortfoliosService portfoliosService;
     private final ProductsService productsService;
     private final String portfolioUUID;
+    private final DecimalFormat df8;
+    private final DecimalFormat df2;
 
     public Wyatt2Service(OrdersService ordersService, PortfoliosService portfoliosService, ProductsService productsService) {
         this.ordersService = ordersService;
         this.productsService = productsService;
         this.portfoliosService = portfoliosService;
         this.portfolioUUID = portfoliosService.listPortfolios(new ListPortfoliosRequest()).getPortfolios().get(0).getUuid();
+        df8 = new DecimalFormat("#.########");
+        df8.setRoundingMode(RoundingMode.DOWN);
+        df2 = new DecimalFormat("#.#");
+        df2.setRoundingMode(RoundingMode.DOWN);
     }
 
     @Scheduled(fixedDelay = SCHEDULED_TASK_TIMEOUT)
-    public void tradingLoop() {
+    public void tradingLoop() throws InterruptedException {
         List<Order> openOrders = ordersService.listOrders(new ListOrdersRequest()).getOrders()
                 .stream()
-                .filter(order -> !order.isSettled())
+                .filter(order -> !order.isSettled() && !order.getStatus().equals("CANCELLED"))
                 .toList();
         if (openOrders.isEmpty()) {
             GetProductCandlesRequest oneMinuteFiveHoursRequest = new GetProductCandlesRequest.Builder()
@@ -67,7 +81,43 @@ public class Wyatt2Service {
             logger.trace("Moving average --- 1 day   --- 5 minute candles --- " + fiveMinuteOneDayMA);
             logger.debug("Moving averages averaged: " + maAverage + " --- Current price: " + currentPrice);
             logger.debug("Would Wyatt2 sell? --- " + ((currentPrice > maAverage) ? "YES" : "NO"));
+            if (currentPrice > maAverage) {
+                double sellPrice = (Math.round(currentPrice * 100.0) / 100.0);
+                double buyBackPrice = (Math.round((currentPrice * 0.975) * 100.0) / 100.0);
+                // Execute sell at current price
+                CreateOrderRequest sellRequest = new CreateOrderRequest.Builder()
+                        .productId(BTC_USD_PRODUCT)
+                        .clientOrderId(UUID.randomUUID().toString())
+                        .retailPortfolioId(portfolioUUID)
+                        .side("SELL")
+                        .orderConfiguration(new OrderConfiguration.Builder()
+                                .limitLimitGtc(new LimitGtc.Builder()
+                                        .limitPrice(String.valueOf(sellPrice))
+                                        .baseSize(getBTCBalance())
+                                        .build())
+                                .build())
+                        .build();
+                CreateOrderResponse sellResponse = ordersService.createOrder(sellRequest);
+                logger.debug("Sell order placed! Waiting 5 seconds...");
+                TimeUnit.SECONDS.sleep(5);
+                // Execute sell at current price
+                CreateOrderRequest buyRequest = new CreateOrderRequest.Builder()
+                        .productId(BTC_USD_PRODUCT)
+                        .clientOrderId(UUID.randomUUID().toString())
+                        .retailPortfolioId(portfolioUUID)
+                        .side("BUY")
+                        .orderConfiguration(new OrderConfiguration.Builder()
+                                .limitLimitGtc(new LimitGtc.Builder()
+                                        .limitPrice(String.valueOf(buyBackPrice))
+                                        .quoteSize(getUSDBalance())
+                                        .build())
+                                .build())
+                        .build();
+                CreateOrderResponse buyBackResponse = ordersService.createOrder(buyRequest);
+                logger.debug("Buy-back order placed!");
+            }
         } else {
+            logger.debug("Open order exists waiting to be filled. Waiting 30 seconds...");
             // Find out how long this order has been open
             // Either wait or cancel order and buy back at current price
         }
@@ -78,5 +128,23 @@ public class Wyatt2Service {
                 .stream()
                 .mapToDouble(candle -> Double.parseDouble(candle.getClose()))
                 .sum()) / (candleStickData.getCandles().size());
+    }
+
+    private String getBTCBalance() {
+        GetPortfolioBreakdownResponse balancesResponse = portfoliosService.getPortfolioBreakdown(new GetPortfolioBreakdownRequest(portfolioUUID));
+        Optional<SpotPosition> spotPositionOptional = balancesResponse.getBreakdown().getSpotPositions()
+                .stream()
+                .filter(spotPosition -> spotPosition.getAsset().equals("BTC"))
+                .findFirst();
+        return spotPositionOptional.map(spotPosition -> df8.format(BigDecimal.valueOf(spotPosition.getTotalBalanceCrypto()))).orElse("0.0");
+    }
+
+    private String getUSDBalance() {
+        GetPortfolioBreakdownResponse balancesResponse = portfoliosService.getPortfolioBreakdown(new GetPortfolioBreakdownRequest(portfolioUUID));
+        Optional<SpotPosition> spotPositionOptional = balancesResponse.getBreakdown().getSpotPositions()
+                .stream()
+                .filter(spotPosition -> spotPosition.getAsset().equals("USD") && spotPosition.getAccountType().equals("ACCOUNT_TYPE_FIAT"))
+                .findFirst();
+        return spotPositionOptional.map(spotPosition -> df2.format(BigDecimal.valueOf(spotPosition.getTotalBalanceCrypto()))).orElse("0.0");
     }
 }

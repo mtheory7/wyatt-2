@@ -1,6 +1,7 @@
 package com.mtheory7.wyatt2.controller;
 
 import com.coinbase.advanced.model.products.GetProductRequest;
+import com.coinbase.advanced.model.products.GetProductResponse;
 import com.coinbase.advanced.products.ProductsService;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -22,5 +23,11 @@ public class PriceController {
     @GetMapping("/BTC")
     public String getBTCPrice() {
         return productsService.getProduct(new GetProductRequest.Builder().productId("BTC-USD").build()).getPrice();
+    }
+
+    @GetMapping("/BTC-USD")
+    public GetProductResponse getBTCProducts() {
+        GetProductResponse response = productsService.getProduct(new GetProductRequest.Builder().productId("BTC-USD").build());
+        return response;
     }
 }
