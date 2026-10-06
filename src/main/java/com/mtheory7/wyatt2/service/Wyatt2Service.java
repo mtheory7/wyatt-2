@@ -79,6 +79,7 @@ public class Wyatt2Service {
             double targetPrice = ((oneMinuteFiveHoursMA + fiveMinuteOneDayMA) / 2) * 1.025;
             logger.trace("Moving average --- 5 hours --- 1 minute candles --- " + oneMinuteFiveHoursMA);
             logger.trace("Moving average --- 1 day   --- 5 minute candles --- " + fiveMinuteOneDayMA);
+            logger.trace("BTC to sell: " + getBTCToSell());
             logger.debug("Target price: " + targetPrice + " --- Current price: " + currentPrice);
             logger.debug("Would Wyatt2 sell? --- " + ((currentPrice > targetPrice) ? "YES" : "NO"));
             if (currentPrice > targetPrice) {
@@ -93,7 +94,7 @@ public class Wyatt2Service {
                         .orderConfiguration(new OrderConfiguration.Builder()
                                 .limitLimitGtc(new LimitGtc.Builder()
                                         .limitPrice(String.valueOf(sellPrice))
-                                        .baseSize(getBTCBalance())
+                                        .baseSize(getBTCToSell())
                                         .build())
                                 .build())
                         .build();
@@ -118,6 +119,7 @@ public class Wyatt2Service {
             }
         } else {
             logger.debug("Open order exists waiting to be filled. Waiting 30 seconds...");
+            logger.trace("USD to buy with: " + getUSDBalance());
             // Find out how long this order has been open
             // Either wait or cancel order and buy back at current price
         }
@@ -130,7 +132,7 @@ public class Wyatt2Service {
                 .sum()) / (candleStickData.getCandles().size());
     }
 
-    private String getBTCBalance() {
+    private String getBTCToSell() {
         GetPortfolioBreakdownResponse balancesResponse = portfoliosService.getPortfolioBreakdown(new GetPortfolioBreakdownRequest(portfolioUUID));
         Optional<SpotPosition> spotPositionOptional = balancesResponse.getBreakdown().getSpotPositions()
                 .stream()
