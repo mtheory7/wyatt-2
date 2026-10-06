@@ -10,7 +10,7 @@
     </parent>
     <groupId>com.mtheory7</groupId>
     <artifactId>wyatt-2</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>1.0.0</version>
     <name>wyatt-2</name>
     <description>wyatt-2</description>
     <url/>

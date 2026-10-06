@@ -76,12 +76,12 @@ public class Wyatt2Service {
             double currentPrice = Double.parseDouble(productsService.getProduct(new GetProductRequest.Builder().productId("BTC-USD").build()).getPrice());
             double oneMinuteFiveHoursMA = calculateMovingAverage(oneMinuteFiveHoursCandleData);
             double fiveMinuteOneDayMA = calculateMovingAverage(fiveMinuteOneDayCandleData);
-            double maAverage = (oneMinuteFiveHoursMA + fiveMinuteOneDayMA) / 2;
+            double targetPrice = ((oneMinuteFiveHoursMA + fiveMinuteOneDayMA) / 2) * 1.025;
             logger.trace("Moving average --- 5 hours --- 1 minute candles --- " + oneMinuteFiveHoursMA);
             logger.trace("Moving average --- 1 day   --- 5 minute candles --- " + fiveMinuteOneDayMA);
-            logger.debug("Moving averages averaged: " + maAverage + " --- Current price: " + currentPrice);
-            logger.debug("Would Wyatt2 sell? --- " + ((currentPrice > maAverage) ? "YES" : "NO"));
-            if (currentPrice > maAverage) {
+            logger.debug("Target price: " + targetPrice + " --- Current price: " + currentPrice);
+            logger.debug("Would Wyatt2 sell? --- " + ((currentPrice > targetPrice) ? "YES" : "NO"));
+            if (currentPrice > targetPrice) {
                 double sellPrice = (Math.round(currentPrice * 100.0) / 100.0);
                 double buyBackPrice = (Math.round((currentPrice * 0.975) * 100.0) / 100.0);
                 // Execute sell at current price
@@ -136,7 +136,7 @@ public class Wyatt2Service {
                 .stream()
                 .filter(spotPosition -> spotPosition.getAsset().equals("BTC"))
                 .findFirst();
-        return spotPositionOptional.map(spotPosition -> df8.format(BigDecimal.valueOf(spotPosition.getTotalBalanceCrypto()))).orElse("0.0");
+        return spotPositionOptional.map(spotPosition -> df8.format(BigDecimal.valueOf(spotPosition.getTotalBalanceCrypto()).divide(BigDecimal.valueOf(2), RoundingMode.HALF_DOWN))).orElse("0.0");
     }
 
     private String getUSDBalance() {
